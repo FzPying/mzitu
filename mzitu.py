@@ -1,3 +1,4 @@
+import json
 import re
 import os
 import time
@@ -15,7 +16,7 @@ HEADERS = {
 }
 
 # 下载图片保存路径
-DIR_PATH = r"D:\mzitu"
+DIR_PATH = r"C:/Users/Fynn/Python/mzitu/mzitu"
 
 
 def get_urls():
@@ -23,23 +24,21 @@ def get_urls():
     获取 mzitu 网站下所有套图的 url
     """
     page_urls = ['http://www.mzitu.com/page/{cnt}'.format(cnt=cnt)
-                 for cnt in range(1, 193)]
+                 for cnt in range(1, 226)]
     print("Please wait for second ...")
     img_urls = []
     for page_url in page_urls:
         try:
-            bs = BeautifulSoup(
-                requests.get(page_url, headers=HEADERS, timeout=10).text,
-                'lxml').find('ul', id="pins")
-            result = re.findall(r"(?<=href=)\S+", str(bs))      # 匹配所有 urls
+            bs = BeautifulSoup(requests.get(page_url, headers=HEADERS, timeout=10).text, 'lxml').find('ul', id="pins")
+            result = re.findall(r"(?<=href=)\S+", str(bs))  # 匹配所有 urls
             img_url = [url.replace('"', "") for url in result]
             img_urls.extend(img_url)
         except Exception as e:
             print(e)
-    return set(img_urls)    # 利用 set 去重 urls
+    return set(img_urls)  # 利用 set 去重 urls
 
 
-lock = threading.Lock()     # 全局资源锁
+lock = threading.Lock()  # 全局资源锁
 
 
 def urls_crawler(url):
@@ -48,8 +47,15 @@ def urls_crawler(url):
     """
     try:
         r = requests.get(url, headers=HEADERS, timeout=10).text
-        folder_name = BeautifulSoup(r, 'lxml').find(
-            'div', class_="main-image").find('img')['alt'].replace("?", " ")
+        images_name = BeautifulSoup(r, 'lxml').find('div', class_="main-image").find('img')['alt'].replace("?", " ")
+        folder_name = url.replace('https://www.mzitu.com/', "")
+        data = {
+            'id': folder_name,
+            'name': images_name,
+            'url': url
+        }
+        print(data)
+        file_append_json(os.path.dirname(os.path.abspath(__file__)) + "/data/images.json", data)
         with lock:
             if make_dir(folder_name):
                 # 套图里图片张数
@@ -101,6 +107,20 @@ def make_dir(folder_name):
     return False
 
 
+def file_append_json(path, data):
+    try:
+        file = open(path, encoding='utf-8')
+        json_data = json.loads(file.read())
+        file.close()
+        json_data.append(data)
+        data_json = json.dumps(json_data)
+        with open(path, "w") as fw:
+            fw.write(data_json)
+            fw.close()
+    except Exception as e:
+        print(e)
+
+
 def delete_empty_dir(save_dir):
     """
     如果程序半路中断的话，可能存在已经新建好文件夹但是仍没有下载的图片的
@@ -109,14 +129,14 @@ def delete_empty_dir(save_dir):
     if os.path.exists(save_dir):
         if os.path.isdir(save_dir):
             for d in os.listdir(save_dir):
-                path = os.path.join(save_dir, d)     # 组装下一级地址
+                path = os.path.join(save_dir, d)  # 组装下一级地址
                 if os.path.isdir(path):
-                    delete_empty_dir(path)      # 递归删除空文件夹
+                    delete_empty_dir(path)  # 递归删除空文件夹
         if not os.listdir(save_dir):
             os.rmdir(save_dir)
             print("remove the empty dir: {}".format(save_dir))
     else:
-        print("Please start your performance!")     # 请开始你的表演
+        print("Please start your performance!")  # 请开始你的表演
 
 
 if __name__ == "__main__":
